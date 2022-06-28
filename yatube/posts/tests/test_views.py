@@ -95,6 +95,8 @@ class PostViewsTest(TestCase):
                     self.user,
                     'Автор не появился'
                 )
+                print(datetime.date.today())
+                print(response.context.get('post').created.date())
                 self.assertEqual(
                     response.context.get('post').created.date(),
                     datetime.date.today(),
