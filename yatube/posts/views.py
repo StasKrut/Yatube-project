@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Follow, Post, Group, Comment
+from .models import Follow, Post, Group
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from .forms import PostForm, CommentForm
@@ -126,6 +126,7 @@ def follow_index(request):
         'posts': posts,
     }
     return render(request, 'posts/follow.html', context)
+
 
 @login_required
 def profile_follow(request, username):

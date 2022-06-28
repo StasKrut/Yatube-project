@@ -30,7 +30,7 @@ class PostUrlsTest(TestCase):
         self.authorized_client = Client()
         # Авторизуем пользователя
         self.authorized_client.force_login(self.user)
-         # Создаем второй авторизованный клиент
+        # Создаем второй авторизованный клиент
         self.authorized_client2 = Client()
         # Авторизуем второго пользователя
         self.authorized_client2.force_login(self.user2)
