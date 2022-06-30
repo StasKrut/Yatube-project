@@ -66,7 +66,7 @@ class PostViewsTest(TestCase):
         self.assertEqual(first_object.text,
                          'Тестовый пост1',
                          'Пост не записался')
-        
+
     def test_forms_edit_post(self):
         """Проверим, что после редактирования поста
            происходит его измеение в БД"""
