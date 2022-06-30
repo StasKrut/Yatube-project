@@ -1,5 +1,5 @@
 from django.test import TestCase, Client
-from ..models import Post, Group, Follow
+from ..models import Post, Group, Comment, Follow
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django import forms
@@ -95,8 +95,6 @@ class PostViewsTest(TestCase):
                     self.user,
                     'Автор не появился'
                 )
-                print(datetime.date.today())
-                print(response.context.get('post').created.date())
                 self.assertEqual(
                     response.context.get('post').created.date(),
                     datetime.date.today(),
@@ -251,7 +249,7 @@ class GroupViewsTest(TestCase):
                 response = self.authorized_client.get(reverse_name)
                 # Взяли первый элемент из списка и проверили,
                 # что его содержание совпадает с ожидаемым
-                first_object = response.context['posts'][0]
+                first_object = response.context['page_obj'][0]
                 post_text_0 = first_object.text
                 post_author_0 = first_object.author
                 post_group_0 = first_object.group
@@ -320,6 +318,53 @@ class Test_cache_index_page(TestCase):
             response.content.decode(),
             'Содержание страницы не изменилось'
         )
+
+
+class CommentViewsTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='auth')
+        cls.user2 = User.objects.create_user(username='commentator')
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test_slug',
+            description='Тестовое описание',
+        )
+
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text='Тестовый пост',
+            group=cls.group
+        )
+
+        cls.comment = Comment.objects.create(
+            author=cls.user2,
+            text='Тестовый коммент',
+            post=cls.post
+        )
+
+    def setUp(self):
+        # Создаем неавторизованный клиент
+        self.guest_client = Client()
+        cache.clear()
+
+    def test_guest_cannot_leave_comments(self):
+        """Неавторизированный пользователь не может оставлять комментарии."""
+        count_comments = Comment.objects.count()
+        form_data = {
+            'text': 'Тестовый коммент1',
+        }
+        # Попробуем создать комментарий неавторизированным пользователем
+        self.guest_client.post(
+            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
+            data=form_data,
+            follow=True,
+        )
+        # Проверим, что количество комментариев не увеличелось
+        self.assertNotEqual(Comment.objects.count() + 1,
+                            count_comments,
+                            'Кол-во постов увеличилось')
 
 
 class FollowViewsTest(TestCase):

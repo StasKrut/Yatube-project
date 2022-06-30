@@ -1,8 +1,9 @@
 from django.test import TestCase, Client
-from ..models import Post, Group
+from ..models import Post, Group, Comment
 from django.contrib.auth import get_user_model
 from http import HTTPStatus
 from django.core.cache import cache
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -22,6 +23,11 @@ class PostUrlsTest(TestCase):
             text='Тестовый пост',
         )
         cls.user2 = User.objects.create_user(username='auth2')
+        cls.comment = Comment.objects.create(
+            author=cls.user2,
+            text='Тестовый коммент',
+            post=cls.post
+        )
 
     def setUp(self):
         # Создаем неавторизованный клиент
@@ -122,3 +128,52 @@ class PostUrlsTest(TestCase):
             'core/404.html',
             'Некорректный шаблон ошибки'
         )
+
+    def test_urls_redirect_after_completing_views(self):
+        """Страницы корректно перенаправляются
+        после выполнения view-функций."""
+        form_data = {
+            'text': 'Тестовый пост1',
+            'group': self.group.id,
+        }
+        url_for_redirect = {
+            reverse('posts:post_create'): reverse(
+                'posts:profile',
+                kwargs={'username': self.user.username}
+            ),
+            reverse(
+                'posts:post_edit', kwargs={'post_id': self.post.id}
+            ): reverse(
+                'posts:post_detail',
+                kwargs={'post_id': self.post.id}
+            ),
+            reverse(
+                'posts:add_comment',
+                kwargs={'post_id': self.post.id}
+            ): reverse(
+                'posts:post_detail',
+                kwargs={'post_id': self.post.id}
+            ),
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': self.user.username}
+            ): reverse(
+                'posts:profile',
+                kwargs={'username': self.user.username}
+            ),
+            reverse(
+                'posts:profile_unfollow',
+                kwargs={'username': self.user.username}
+            ): reverse(
+                'posts:profile',
+                kwargs={'username': self.user.username}
+            ),
+        }
+        for path, redirect_urls in url_for_redirect.items():
+            with self.subTest(path=path):
+                response = self.authorized_client.post(
+                    path, data=form_data, follow=True
+                )
+                self.assertRedirects(
+                    response, redirect_urls
+                )

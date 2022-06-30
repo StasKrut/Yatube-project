@@ -19,7 +19,6 @@ def index(request):
     # информацию в шаблон
     context = {
         'page_obj': page_obj,
-        'posts': posts,
     }
     return render(request, 'posts/index.html', context)
 
@@ -32,7 +31,6 @@ def group_posts(request, slug):
     context = {
         'group': group,
         'page_obj': page_obj,
-        'posts': posts,
     }
     return render(request, 'posts/group_list.html', context)
 
@@ -49,7 +47,6 @@ def profile(request, username):
     # В файле utils.py создал функцию paginate_page для паджинации
     page_obj = paginate_page(request, posts)
     context = {
-        'posts': posts,
         'page_obj': page_obj,
         'author': author,
         'following': following,
@@ -79,7 +76,6 @@ def post_create(request):
             post.author = request.user
             post.save()
             return redirect('posts:profile', username=str(request.user))
-        return render(request, 'posts/create_post.html', {'form': form})
     return render(request, 'posts/create_post.html', {'form': form})
 
 
@@ -97,9 +93,11 @@ def post_edit(request, post_id):
         if form.is_valid():
             form.save()
             return redirect('posts:post_detail', post_id)
-    context = {'form': form,
-               'is_edit': True,
-               'post_id': post_id}
+    context = {
+        'form': form,
+        'is_edit': True,
+        'post_id': post_id
+    }
     return render(request, 'posts/create_post.html', context)
 
 
@@ -123,7 +121,6 @@ def follow_index(request):
     page_obj = paginate_page(request, posts)
     context = {
         'page_obj': page_obj,
-        'posts': posts,
     }
     return render(request, 'posts/follow.html', context)
 
