@@ -1,10 +1,17 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from ..models import Post, Group, Comment, Follow
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django import forms
 import datetime
 from django.core.cache import cache
+import shutil
+import tempfile
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
 User = get_user_model()
@@ -273,7 +280,76 @@ class GroupViewsTest(TestCase):
                          'Пост в некорректной группе')
 
 
-class Test_cache_index_page(TestCase):
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class ImgViewsTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='auth')
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test_slug',
+            description='Тестовое описание',
+        )
+        small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        cls.image = SimpleUploadedFile(
+            name='small.gif',
+            content=small_gif,
+            content_type='image/gif'
+        )
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text='Тестовый пост',
+            group=cls.group,
+            image=cls.image,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        # Метод shutil.rmtree удаляет директорию и всё её содержимое
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
+    def setUp(self):
+        # Создаем авторизованный клиент
+        self.authorized_client = Client()
+        # Авторизуем пользователя
+        self.authorized_client.force_login(self.user)
+
+    def test_image_in_new_post(self):
+        """Новый пост выдается с картинкой."""
+        templates_pages_names = {
+            reverse('posts:index'): 'posts/index.html',
+            (
+                reverse('posts:group_list', kwargs={'slug': self.group.slug})
+            ): 'posts/group_list.html',
+            (
+                reverse('posts:profile',
+                        kwargs={'username': self.user.username})
+            ): 'posts/profile.html',
+            (
+                reverse('posts:post_detail',
+                        kwargs={'post_id': self.post.id})
+            ): 'posts/post_detail.html',
+        }
+        for reverse_name in templates_pages_names.keys():
+            with self.subTest(reverse_name=reverse_name):
+                response = self.authorized_client.get(reverse_name)
+                self.assertEqual(
+                    response.context.get('post').image,
+                    'posts/small.gif',
+                    'Картинка не появилась'
+                )
+
+
+class CacheViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -347,6 +423,10 @@ class CommentViewsTest(TestCase):
     def setUp(self):
         # Создаем неавторизованный клиент
         self.guest_client = Client()
+        # Создаем авторизованный клиент
+        self.authorized_client = Client()
+        # Авторизуем пользователя
+        self.authorized_client.force_login(self.user)
         cache.clear()
 
     def test_guest_cannot_leave_comments(self):
@@ -365,6 +445,26 @@ class CommentViewsTest(TestCase):
         self.assertNotEqual(Comment.objects.count() + 1,
                             count_comments,
                             'Кол-во постов увеличилось')
+
+    def test_comments_shown_on_post_detail_page(self):
+        """Комментарии после успешной отправки
+        отображаются на странице поста."""
+        form_data = {
+            'text': 'Тестовый коммент1',
+        }
+        self.authorized_client.post(
+            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
+            data=form_data,
+            follow=True,
+        )
+        response = self.authorized_client.get(
+            reverse('posts:post_detail', kwargs={'post_id': self.post.id})
+        )
+        self.assertEqual(
+            response.context.get('comments')[1].text,
+            'Тестовый коммент1',
+            'Комментарий не отображается'
+        )
 
 
 class FollowViewsTest(TestCase):

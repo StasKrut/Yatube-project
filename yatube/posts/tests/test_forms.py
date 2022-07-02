@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
-
+from django.core.cache import cache
 import shutil
 import tempfile
 
@@ -16,7 +16,7 @@ TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 User = get_user_model()
 
 
-class PostViewsTest(TestCase):
+class PostFormsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -90,7 +90,7 @@ class PostViewsTest(TestCase):
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
-class ImgViewsTest(TestCase):
+class ImgFormsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -131,31 +131,7 @@ class ImgViewsTest(TestCase):
         self.authorized_client = Client()
         # Авторизуем пользователя
         self.authorized_client.force_login(self.user)
-
-    def test_image_in_new_post(self):
-        """Новый пост выдается с картинкой."""
-        templates_pages_names = {
-            reverse('posts:index'): 'posts/index.html',
-            (
-                reverse('posts:group_list', kwargs={'slug': self.group.slug})
-            ): 'posts/group_list.html',
-            (
-                reverse('posts:profile',
-                        kwargs={'username': self.user.username})
-            ): 'posts/profile.html',
-            (
-                reverse('posts:post_detail',
-                        kwargs={'post_id': self.post.id})
-            ): 'posts/post_detail.html',
-        }
-        for reverse_name in templates_pages_names.keys():
-            with self.subTest(reverse_name=reverse_name):
-                response = self.authorized_client.get(reverse_name)
-                self.assertEqual(
-                    response.context.get('post').image,
-                    'posts/small.gif',
-                    'Картинка не появилась'
-                )
+        cache.clear()
 
     def test_image_in_database(self):
         """Проверим, что при создании нового поста
@@ -163,70 +139,20 @@ class ImgViewsTest(TestCase):
         form_data = {
             'text': 'Тестовый пост1',
             'group': self.group.id,
-            'image': 'posts/small.gif',
+            'image': self.image.name,
         }
-        self.authorized_client.post(
+        response = self.authorized_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True,
         )
-        # Проверяем правильно ли записался пост в БД
+        # Проверяем правильно ли записался пост в БД,
+        # пост должен быть первым в списке и в нем должна содержаться картинка
+        first_object = response.context['page_obj'][0]
         self.assertTrue(
             Post.objects.filter(
-                text='Тестовый пост1',
+                text=first_object.text,
+                group=first_object.group,
                 image__isnull=False,
             ).exists()
-        )
-
-
-class CommentFormsTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
-        cls.user2 = User.objects.create_user(username='commentator')
-        cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='test_slug',
-            description='Тестовое описание',
-        )
-
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-            group=cls.group
-        )
-
-        cls.comment = Comment.objects.create(
-            author=cls.user2,
-            text='Тестовый коммент',
-            post=cls.post
-        )
-
-    def setUp(self):
-        # Создаем неавторизованный клиент
-        self.guest_client = Client()
-        # Создаем второй клиент
-        self.authorized_client = Client()
-        # Авторизуем пользователя
-        self.authorized_client.force_login(self.user)
-
-    def test_comments_shown_on_post_detail_page(self):
-        """Комментарии после успешной отправки
-        отображаются на странице поста."""
-        form_data = {
-            'text': 'Тестовый коммент1',
-        }
-        self.authorized_client.post(
-            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
-            data=form_data,
-            follow=True,
-        )
-        response = self.authorized_client.get(
-            reverse('posts:post_detail', kwargs={'post_id': self.post.id})
-        )
-        self.assertEqual(
-            response.context.get('comments')[1].text,
-            'Тестовый коммент1',
-            'Комментарий не отображается'
         )
