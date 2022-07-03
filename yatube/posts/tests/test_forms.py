@@ -63,7 +63,7 @@ class PostFormsTest(TestCase):
                          'Кол-во постов не увеличилось')
         # Проверяем правильно ли записался пост в БД
         # пост должен быть первым в списке
-        first_object = Post.objects.order_by('-created').first()
+        first_object = Post.objects.first()
         self.assertEqual(first_object.text,
                          'Тестовый пост1',
                          'Пост не записался')
@@ -148,14 +148,7 @@ class ImgFormsTest(TestCase):
         )
         # Проверяем правильно ли записался пост в БД,
         # пост должен быть первым в списке и в нем должна содержаться картинка
-        first_object = Post.objects.order_by('-created').first()
-        self.assertTrue(
-            Post.objects.filter(
-                text=first_object.text,
-                group=first_object.group,
-                image__isnull=False,
-            ).exists()
-        )
+        first_object = Post.objects.first()
         self.assertEqual(first_object.text,
                          'Тестовый пост1',
                          'Пост не записался')
