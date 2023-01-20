@@ -45,8 +45,10 @@
 - Запускаем проект:
 
 ```python manage.py runserver```
-- Открываем ссылку http://127.0.0.1:8000/ в любом браузере.
 
-### Автор в рамках учебного курса ЯП Python - разработчик:
+#### После запуска проект будут доступен по адресу: http://127.0.0.1:8000/
 
-✅ [Stanislav Krutskikh](https://github.com/StasKrut)
+Проект сделан в рамках учебного процесса по специализации Python-разработчик (backend) Яндекс.Практикум.
+
+Автор в рамках учебного курса ЯП Python - разработчик:
+- :white_check_mark: [Stanislav Krutskikh](https://github.com/StasKrut)
